@@ -1,0 +1,4 @@
+# Paksa LF: skrip .sh dengan CRLF gagal dijalankan di container Linux ($'\r': command not found)
+* text=auto eol=lf
+*.sh text eol=lf
+*.sql text eol=lf

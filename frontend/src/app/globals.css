@@ -1,0 +1,207 @@
+@import "tailwindcss";
+
+/* Varian kustom:
+ * - dark:    aktif kalau <html class="dark">
+ * - ringkas: aktif kalau <html data-sidebar="ringkas"> (sidebar diperkecil)
+ * Keduanya dipasang skrip di <head> SEBELUM halaman tampil, jadi tidak ada kedipan. */
+@custom-variant dark (&:where(.dark, .dark *));
+@custom-variant ringkas (&:where([data-sidebar="ringkas"], [data-sidebar="ringkas"] *));
+
+/*
+ * Token warna (terang di :root, gelap di .dark):
+ * - Tata letak minimalis tapi berwarna: aksen indigo untuk navigasi & tombol,
+ *   warna-warni untuk data, abu slate untuk netral.
+ * - Warna node konsisten: barat = hijau, tengah = oranye, timur = biru langit.
+ *   Varian -teks dipakai untuk tulisan supaya tetap terbaca di kedua tema.
+ * - bahaya (merah) = gagal/mati, gantung (fuchsia) = transaksi 2PC in-doubt.
+ * - Variabel ala shadcn/ui disediakan supaya `npx shadcn add <komponen>` langsung cocok.
+ */
+:root {
+  --background: #ffffff;
+  --foreground: #0f172a;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --primary: #4f46e5;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --muted: #f1f5f9;
+  --muted-foreground: #64748b;
+  --accent: #eef2ff;
+  --accent-foreground: #4338ca;
+  --destructive: #dc2626;
+  --border: #e2e8f0;
+  --input: #e2e8f0;
+  --ring: #818cf8;
+  --radius: 0.625rem;
+
+  --ink: #0f172a;
+  --ink-soft: #64748b;
+  --line: #e2e8f0;
+  --line-soft: #f1f5f9;
+  --sidebar: #f8fafc;
+  --aksen: #4f46e5;
+  --aksen-soft: #eef2ff;
+  --aksen-teks: #4338ca;
+  --barat-soft: #ecfdf5;
+  --barat-teks: #047857;
+  --tengah-soft: #fff7ed;
+  --tengah-teks: #c2410c;
+  --timur-soft: #f0f9ff;
+  --timur-teks: #0369a1;
+  --bahaya: #dc2626;
+  --bahaya-soft: #fef2f2;
+  --gantung: #c026d3;
+  --gantung-soft: #fdf4ff;
+  --malam: #0f172a;
+  color-scheme: light;
+}
+
+.dark {
+  --background: #0f172a;
+  --foreground: #f1f5f9;
+  --card: #0f172a;
+  --card-foreground: #f1f5f9;
+  --popover: #0f172a;
+  --popover-foreground: #f1f5f9;
+  --primary: #6366f1;
+  --primary-foreground: #ffffff;
+  --secondary: #1e293b;
+  --secondary-foreground: #f1f5f9;
+  --muted: #1e293b;
+  --muted-foreground: #94a3b8;
+  --accent: #1e1b4b;
+  --accent-foreground: #c7d2fe;
+  --destructive: #f87171;
+  --border: #1e293b;
+  --input: #334155;
+  --ring: #6366f1;
+
+  --ink: #f1f5f9;
+  --ink-soft: #94a3b8;
+  --line: #1e293b;
+  --line-soft: #172033;
+  --sidebar: #020617;
+  --aksen: #6366f1;
+  --aksen-soft: #1e1b4b;
+  --aksen-teks: #a5b4fc;
+  --barat-soft: #052e24;
+  --barat-teks: #34d399;
+  --tengah-soft: #3b1d0a;
+  --tengah-teks: #fb923c;
+  --timur-soft: #082f49;
+  --timur-teks: #38bdf8;
+  --bahaya: #f87171;
+  --bahaya-soft: #3a1418;
+  --gantung: #e879f9;
+  --gantung-soft: #3b0a3f;
+  --malam: #020617;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --font-sans: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+
+  /* Token khusus proyek */
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-sidebar: var(--sidebar);
+  --color-aksen: var(--aksen);
+  --color-aksen-soft: var(--aksen-soft);
+  --color-aksen-teks: var(--aksen-teks);
+  --color-barat: #10b981;
+  --color-barat-soft: var(--barat-soft);
+  --color-barat-teks: var(--barat-teks);
+  --color-tengah: #f97316;
+  --color-tengah-soft: var(--tengah-soft);
+  --color-tengah-teks: var(--tengah-teks);
+  --color-timur: #0ea5e9;
+  --color-timur-soft: var(--timur-soft);
+  --color-timur-teks: var(--timur-teks);
+  --color-bahaya: var(--bahaya);
+  --color-bahaya-soft: var(--bahaya-soft);
+  --color-gantung: var(--gantung);
+  --color-gantung-soft: var(--gantung-soft);
+  --color-malam: var(--malam);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  html {
+    background: var(--sidebar);
+    font-feature-settings: "tnum" 1; /* angka tabular: kolom angka rata */
+  }
+  body {
+    background: var(--sidebar);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+}
+
+/* Arsiran untuk node yang mati */
+.arsir-mati {
+  background-color: var(--bahaya-soft);
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--bahaya) 22%, transparent) 0 6px,
+    transparent 6px 12px
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Muncul halus: toast & command palette */
+@keyframes masuk {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.animasi-masuk {
+  animation: masuk 160ms ease-out;
+}

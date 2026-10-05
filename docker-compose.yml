@@ -1,0 +1,180 @@
+# =====================================================================
+#  MBG-SBDT Starter
+#  Cluster PostgreSQL terdistribusi + backend FastAPI
+#
+#  Topologi:
+#    pusat        : koordinator (referensi, direktori NIM, FDW, log 2PC)
+#    replica      : hot standby pusat (streaming replication, read-only)
+#    node-barat   : fragmen provinsi kode 11–29 (Sumatera)
+#    node-tengah  : fragmen provinsi kode 30–51 (Jawa & Bali)
+#    node-timur   : fragmen provinsi kode 52–99 (NTB s.d. Papua)
+#    setup        : sekali jalan — menyambungkan logical replication
+#    backend      : FastAPI (API + koordinator 2PC)
+#
+#  Semua password di bawah adalah DEFAULT DEV. Ganti lewat file .env.
+# =====================================================================
+name: mbg-sbdt
+
+x-pg-env: &pg-env
+  POSTGRES_USER: postgres
+  POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres_dev_123}
+  POSTGRES_DB: mbg
+  POSTGRES_INITDB_ARGS: "--encoding=UTF8"   # teks dibaca sebagai str (bukan bytes) di Python
+  APP_PASSWORD: ${APP_PASSWORD:-app_dev_123}
+  FDW_PASSWORD: ${FDW_PASSWORD:-fdw_dev_123}
+  AI_PASSWORD: ${AI_PASSWORD:-ai_dev_123}
+  REPLICATOR_PASSWORD: ${REPLICATOR_PASSWORD:-repl_dev_123}
+  TZ: Asia/Jakarta
+
+x-pg-health: &pg-health
+  # Pakai -h 127.0.0.1 (TCP), bukan unix socket: selama init script berjalan,
+  # server sementara hanya mendengar di socket. Jadi container baru "healthy"
+  # setelah SEMUA init script selesai.
+  test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d mbg"]
+  interval: 5s
+  timeout: 3s
+  retries: 30
+  start_period: 30s
+
+services:
+  # ------------------------------------------------------------------
+  pusat:
+    image: postgres:17
+    environment: *pg-env
+    command:
+      - postgres
+      - -c
+      - wal_level=logical              # wajib untuk logical replication (publisher)
+      - -c
+      - max_prepared_transactions=20   # wajib > 0 untuk 2PC (default-nya 0!)
+      - -c
+      - wal_keep_size=256MB            # simpan WAL supaya replica tidak ketinggalan
+    volumes:
+      - pusat_data:/var/lib/postgresql/data
+      - ./db/pusat/init:/docker-entrypoint-initdb.d:ro
+      - ./verify:/verify:ro
+    ports:
+      - "${PORT_PUSAT:-5440}:5432"
+    healthcheck: *pg-health
+
+  # ------------------------------------------------------------------
+  replica:
+    image: postgres:17
+    environment: *pg-env
+    # Entrypoint khusus: ambil base backup dari pusat (pg_basebackup) saat
+    # volume masih kosong, lalu jalan sebagai hot standby.
+    entrypoint: ["bash", "/replica/entrypoint.sh"]
+    command:
+      - postgres
+      - -c
+      - hot_standby=on
+      - -c
+      # Standby WAJIB punya nilai >= primary untuk parameter ini,
+      # kalau tidak replica menolak start ("insufficient parameter settings").
+      - max_prepared_transactions=20
+    volumes:
+      - replica_data:/var/lib/postgresql/data
+      - ./db/replica:/replica:ro
+      - ./verify:/verify:ro
+    ports:
+      - "${PORT_REPLICA:-5441}:5432"
+    depends_on:
+      pusat:
+        condition: service_healthy
+    healthcheck: *pg-health
+
+  # ------------------------------------------------------------------
+  node-barat:
+    image: postgres:17
+    environment:
+      <<: *pg-env
+      NODE_NAME: barat
+      PROV_MIN: "11"   # inklusif
+      PROV_MAX: "30"   # eksklusif
+    command: ["postgres", "-c", "max_prepared_transactions=20"]
+    volumes:
+      - barat_data:/var/lib/postgresql/data
+      - ./db/wilayah/init:/docker-entrypoint-initdb.d:ro
+      - ./verify:/verify:ro
+    ports:
+      - "${PORT_BARAT:-5442}:5432"
+    healthcheck: *pg-health
+
+  node-tengah:
+    image: postgres:17
+    environment:
+      <<: *pg-env
+      NODE_NAME: tengah
+      PROV_MIN: "30"
+      PROV_MAX: "52"
+    command: ["postgres", "-c", "max_prepared_transactions=20"]
+    volumes:
+      - tengah_data:/var/lib/postgresql/data
+      - ./db/wilayah/init:/docker-entrypoint-initdb.d:ro
+      - ./verify:/verify:ro
+    ports:
+      - "${PORT_TENGAH:-5443}:5432"
+    healthcheck: *pg-health
+
+  node-timur:
+    image: postgres:17
+    environment:
+      <<: *pg-env
+      NODE_NAME: timur
+      PROV_MIN: "52"
+      PROV_MAX: "100"
+    command: ["postgres", "-c", "max_prepared_transactions=20"]
+    volumes:
+      - timur_data:/var/lib/postgresql/data
+      - ./db/wilayah/init:/docker-entrypoint-initdb.d:ro
+      - ./verify:/verify:ro
+    ports:
+      - "${PORT_TIMUR:-5444}:5432"
+    healthcheck: *pg-health
+
+  # ------------------------------------------------------------------
+  # Sekali jalan: membuat SUBSCRIPTION di tiap node (logical replication
+  # tabel referensi dari pusat), lalu menunggu datanya tersalin.
+  setup:
+    image: postgres:17
+    environment: *pg-env
+    entrypoint: ["bash", "/setup/setup.sh"]
+    volumes:
+      - ./setup:/setup:ro
+    depends_on:
+      pusat:
+        condition: service_healthy
+      node-barat:
+        condition: service_healthy
+      node-tengah:
+        condition: service_healthy
+      node-timur:
+        condition: service_healthy
+    restart: "no"
+
+  # ------------------------------------------------------------------
+  backend:
+    build: ./backend
+    environment:
+      DSN_PUSAT: postgresql://app_user:${APP_PASSWORD:-app_dev_123}@pusat:5432/mbg
+      DSN_REPLICA: postgresql://app_user:${APP_PASSWORD:-app_dev_123}@replica:5432/mbg
+      DSN_BARAT: postgresql://app_user:${APP_PASSWORD:-app_dev_123}@node-barat:5432/mbg
+      DSN_TENGAH: postgresql://app_user:${APP_PASSWORD:-app_dev_123}@node-tengah:5432/mbg
+      DSN_TIMUR: postgresql://app_user:${APP_PASSWORD:-app_dev_123}@node-timur:5432/mbg
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000}
+      TZ: Asia/Jakarta
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+    volumes:
+      - ./backend/app:/app/app
+    ports:
+      - "${PORT_BACKEND:-8000}:8000"
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+
+volumes:
+  pusat_data:
+  replica_data:
+  barat_data:
+  tengah_data:
+  timur_data:
